@@ -1,0 +1,16 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+}
+
+model NotificationLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  recipient String
+  message   String
+  channel   String   @default("EMAIL")
+  status    String   @default("SENT")
+  createdAt DateTime @default(now())
+}
