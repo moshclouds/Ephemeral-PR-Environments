@@ -1,0 +1,15 @@
+# Root .gitignore
+
+node_modules/
+.env
+.env.*
+!.env.sample
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
