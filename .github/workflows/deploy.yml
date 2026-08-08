@@ -1,0 +1,33 @@
+name: Deploy to Staging VM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to GCP VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            # Navigate to the project directory
+            cd ~/Ephemeral-PR-Environments
+            
+            # Pull the latest changes from the main branch
+            git pull origin main
+            
+            # Navigate to the infra directory
+            cd infra
+            
+            # Rebuild and restart the containers
+            docker compose -f docker-compose.staging.yml up --build -d
