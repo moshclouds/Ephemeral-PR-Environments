@@ -7,30 +7,21 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment: staging
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Deploy to GCP VM via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USERNAME }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            # Clone repo if it doesn't exist yet on the VM, otherwise fetch & pull updates
-            if [ ! -d "$HOME/Ephemeral-PR-Environments/.git" ]; then
-              git clone https://github.com/${{ github.repository }}.git ~/Ephemeral-PR-Environments
-            fi
-
-            # Navigate to project and pull latest changes
-            cd ~/Ephemeral-PR-Environments
-            git fetch origin main
-            git reset --hard origin/main
-
-            # Navigate to infra folder and rebuild containers
-            cd infra
-            docker compose -f docker-compose.staging.yml up --build -d
+      - name: Deploy Containers
+        run: |
+          # Use rsync to copy the latest code to deployment directory.
+          # (This safely merges the new code without overwriting the .env files or certs).
+          rsync -a --exclude='.git/' ./ ~/Ephemeral-PR-Environments/
+          
+          # Navigate to the deployment infra folder
+          cd ~/Ephemeral-PR-Environments/infra
+          
+          # Rebuild and restart the containers
+          docker compose -f docker-compose.staging.yml up --build -d

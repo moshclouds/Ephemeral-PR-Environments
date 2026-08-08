@@ -16,3 +16,7 @@ node_modules/
 
 # keys
 keys/
+
+# certbot
+certbot_conf/
+certbot_www/
