@@ -8,8 +8,11 @@ node_modules/
 # IDEs
 .vscode/
 .idea/
-*.suo
+*.suo   
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# keys
+keys/
