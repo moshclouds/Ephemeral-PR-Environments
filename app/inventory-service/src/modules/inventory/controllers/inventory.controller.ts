@@ -1,7 +1,8 @@
 import { Controller, Post, Get, Body, Inject } from '@nestjs/common';
 import { CreateInventoryItemDto } from '../dto/create-inventory-item.dto';
 import { DeductStockDto } from '../dto/deduct-stock.dto';
-import { IInventoryService, INVENTORY_SERVICE_TOKEN } from '../services/inventory.service';
+import { INVENTORY_SERVICE_TOKEN } from '../services/inventory.service';
+import type { IInventoryService } from '../services/inventory.service';
 
 @Controller('inventory')
 export class InventoryController {

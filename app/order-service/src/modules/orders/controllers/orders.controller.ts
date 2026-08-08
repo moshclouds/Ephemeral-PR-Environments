@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, Inject } from '@nestjs/common';
 import { CreateOrderDto } from '../dto/create-order.dto';
-import { IOrdersService, ORDERS_SERVICE_TOKEN } from '../services/orders.service';
+import { ORDERS_SERVICE_TOKEN } from '../services/orders.service';
+import type { IOrdersService } from '../services/orders.service';
 
 @Controller('orders')
 export class OrdersController {
