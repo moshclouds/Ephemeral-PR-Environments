@@ -10,15 +10,30 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mysql-db:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mongo-db:
     image: mongo:6-jammy
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ==========================================
   # Applications
@@ -30,7 +45,8 @@ services:
     env_file:
       - ../app/order-service/.env
     depends_on:
-      - postgres-db
+      postgres-db:
+        condition: service_healthy
 
   inventory-service:
     build:
@@ -39,7 +55,8 @@ services:
     env_file:
       - ../app/inventory-service/.env
     depends_on:
-      - mysql-db
+      mysql-db:
+        condition: service_healthy
 
   notification-service:
     build:
@@ -48,7 +65,8 @@ services:
     env_file:
       - ../app/notification-service/.env
     depends_on:
-      - mongo-db
+      mongo-db:
+        condition: service_healthy
 
   # ==========================================
   # NGINX Reverse Proxy

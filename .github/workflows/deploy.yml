@@ -27,5 +27,5 @@ jobs:
           docker compose -f docker-compose.staging.yml up --build -d
     
       # Clean up old Docker images to save disk space(Temporary)
-      - name: Docker Auto-Cleanup
-        run: docker system prune -af
+      # - name: Docker Auto-Cleanup
+      #   run: docker system prune -af
