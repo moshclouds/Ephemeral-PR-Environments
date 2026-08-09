@@ -6,6 +6,8 @@ import './App.css'
 // Axios Interceptor for HTTP Header Propagation
 const api = axios.create()
 
+const cloudRunSuffix = import.meta.env.VITE_CLOUD_RUN_SUFFIX;
+
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const urlParams = new URLSearchParams(window.location.search);
@@ -20,9 +22,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-const ORDER_URL = import.meta.env.VITE_API_ORDER_URL || 'http://localhost:3000'
-const INVENTORY_URL = import.meta.env.VITE_API_INVENTORY_URL || 'http://localhost:3001'
-const NOTIFICATION_URL = import.meta.env.VITE_API_NOTIFICATION_URL || 'http://localhost:3002'
+const getBaseUrl = (servicePrefix: string, envVar: string | undefined, defaultLocalUrl: string, prQueryKey: string) => {
+  if (typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const prNumber = urlParams.get(prQueryKey);
+    // If a PR is specified and we have the suffix, route directly to Cloud Run
+    if (prNumber && cloudRunSuffix) {
+      return `https://${servicePrefix}-pr-${prNumber}${cloudRunSuffix}`;
+    }
+  }
+  return envVar || defaultLocalUrl;
+};
+
+const ORDER_URL = getBaseUrl('order-service', import.meta.env.VITE_API_ORDER_URL, 'http://localhost:3000', 'order_pr')
+const INVENTORY_URL = getBaseUrl('inventory-service', import.meta.env.VITE_API_INVENTORY_URL, 'http://localhost:3001', 'inventory_pr')
+const NOTIFICATION_URL = getBaseUrl('notification-service', import.meta.env.VITE_API_NOTIFICATION_URL, 'http://localhost:3002', 'notification_pr')
 
 type ModalType = 'orders' | 'notifications' | null;
 

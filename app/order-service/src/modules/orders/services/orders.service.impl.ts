@@ -37,7 +37,7 @@ export class OrdersServiceImpl implements IOrdersService {
         if (inventoryPr && config.url?.includes(this.inventoryServiceUrl)) {
           config.url = config.url.replace(
             this.inventoryServiceUrl,
-            `https://inventory-service-pr${inventoryPr}${this.cloudRunSuffix}`
+            `https://inventory-service-pr-${inventoryPr}${this.cloudRunSuffix}`
           );
         }
 
@@ -46,7 +46,7 @@ export class OrdersServiceImpl implements IOrdersService {
         if (notificationPr && config.url?.includes(this.notificationServiceUrl)) {
           config.url = config.url.replace(
             this.notificationServiceUrl,
-            `https://notification-service-pr${notificationPr}${this.cloudRunSuffix}`
+            `https://notification-service-pr-${notificationPr}${this.cloudRunSuffix}`
           );
         }
       }

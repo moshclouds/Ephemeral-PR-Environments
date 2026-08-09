@@ -1,0 +1,171 @@
+name: Deploy Ephemeral PR Environment
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  # Job 1: Cleanup if PR is closed
+  cleanup-pr:
+    if: github.event.action == 'closed'
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Cleanup Databases
+        run: |
+          bash ./scripts/cleanup_pr.sh order-service ${{ github.event.pull_request.number }} || true
+          bash ./scripts/cleanup_pr.sh inventory-service ${{ github.event.pull_request.number }} || true
+          bash ./scripts/cleanup_pr.sh notification-service ${{ github.event.pull_request.number }} || true
+          
+      - name: Delete Cloud Run Services
+        run: |
+          gcloud run services delete order-service-pr-${{ github.event.pull_request.number }} --region=us-central1 --quiet || true
+          gcloud run services delete inventory-service-pr-${{ github.event.pull_request.number }} --region=us-central1 --quiet || true
+          gcloud run services delete notification-service-pr-${{ github.event.pull_request.number }} --region=us-central1 --quiet || true
+
+  # Job 2: Identify changed services
+  changes:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      order: ${{ steps.filter.outputs.order }}
+      inventory: ${{ steps.filter.outputs.inventory }}
+      notification: ${{ steps.filter.outputs.notification }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            order:
+              - 'app/order-service/**'
+            inventory:
+              - 'app/inventory-service/**'
+            notification:
+              - 'app/notification-service/**'
+            frontend:
+              - 'app/frontend/**'
+
+  # Job 3: Clone Database (Runs on VM)
+  clone-db:
+    needs: changes
+    if: github.event.action != 'closed'
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Clone Order DB
+        if: needs.changes.outputs.order == 'true'
+        run: bash ./scripts/clone_db.sh order-service ${{ github.event.pull_request.number }}
+
+      - name: Clone Inventory DB
+        if: needs.changes.outputs.inventory == 'true'
+        run: bash ./scripts/clone_db.sh inventory-service ${{ github.event.pull_request.number }}
+
+      - name: Clone Notification DB
+        if: needs.changes.outputs.notification == 'true'
+        run: bash ./scripts/clone_db.sh notification-service ${{ github.event.pull_request.number }}
+
+  # Job 4: Build & Deploy to Cloud Run
+  deploy-pr:
+    needs: [changes, clone-db]
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    environment: staging
+    strategy:
+      matrix:
+        service: [order-service, inventory-service, notification-service]
+        include:
+          - service: order-service
+            changed: ${{ needs.changes.outputs.order }}
+            port: 3000
+            db_env: DATABASE_URL="postgresql://user:password@${{ secrets.VM_INTERNAL_IP }}:5432/order_db_pr_${{ github.event.pull_request.number }}"
+          - service: inventory-service
+            changed: ${{ needs.changes.outputs.inventory }}
+            port: 3001
+            db_env: DATABASE_URL="mysql://root:password@${{ secrets.VM_INTERNAL_IP }}:3306/inventory_db_pr_${{ github.event.pull_request.number }}"
+          - service: notification-service
+            changed: ${{ needs.changes.outputs.notification }}
+            port: 3002
+            db_env: DATABASE_URL="mongodb://${{ secrets.VM_INTERNAL_IP }}:27017/notification_db_pr_${{ github.event.pull_request.number }}?replicaSet=rs0"
+    steps:
+      - name: Checkout Code
+        if: matrix.changed == 'true'
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        if: matrix.changed == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        if: matrix.changed == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker Auth
+        if: matrix.changed == 'true'
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build & Push Image
+        if: matrix.changed == 'true'
+        run: |
+          IMAGE="${{ secrets.GCP_AR_REPO }}/${{ matrix.service }}:pr-${{ github.event.pull_request.number }}"
+          docker build -t $IMAGE ./app/${{ matrix.service }}
+          docker push $IMAGE
+
+      - name: Deploy to Cloud Run
+        if: matrix.changed == 'true'
+        run: |
+          IMAGE="${{ secrets.GCP_AR_REPO }}/${{ matrix.service }}:pr-${{ github.event.pull_request.number }}"
+          SERVICE_NAME="${{ matrix.service }}-pr-${{ github.event.pull_request.number }}"
+          
+          gcloud run deploy $SERVICE_NAME \
+            --image $IMAGE \
+            --region us-central1 \
+            --port ${{ matrix.port }} \
+            --vpc-egress all-traffic \
+            --network default \
+            --subnet default \
+            --allow-unauthenticated \
+            --set-env-vars "${{ matrix.db_env }}" \
+            --set-env-vars "CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
+
+  # Job 5: Post PR Comment
+  post-comment:
+    needs: [changes, deploy-pr]
+    if: github.event.action != 'closed' && (needs.changes.outputs.order == 'true' || needs.changes.outputs.inventory == 'true' || needs.changes.outputs.notification == 'true' || needs.changes.outputs.frontend == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Frontend Query Params
+        id: params
+        run: |
+          PARAMS=""
+          [ "${{ needs.changes.outputs.order }}" == "true" ] && PARAMS="${PARAMS}order_pr=${{ github.event.pull_request.number }}&"
+          [ "${{ needs.changes.outputs.inventory }}" == "true" ] && PARAMS="${PARAMS}inventory_pr=${{ github.event.pull_request.number }}&"
+          [ "${{ needs.changes.outputs.notification }}" == "true" ] && PARAMS="${PARAMS}notification_pr=${{ github.event.pull_request.number }}&"
+          PARAMS=${PARAMS%&}
+          echo "query=?$PARAMS" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const feUrl = `https://client-web-app.ephemeral-poc.run.place${{ steps.params.outputs.query }}`;
+            const body = `🚀 **Ephemeral PR Environment Deployed!**\n\n` +
+                         `Test your changes instantly using this link:\n` +
+                         `👉 [**Open Frontend PR Dashboard**](${feUrl})\n\n` +
+                         `*The relevant Cloud Run backends have been spun up and isolated databases cloned.*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            })

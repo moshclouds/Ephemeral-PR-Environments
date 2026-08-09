@@ -34,6 +34,7 @@ jobs:
             --build-arg VITE_API_ORDER_URL="${{ secrets.VITE_API_ORDER_URL }}" \
             --build-arg VITE_API_INVENTORY_URL="${{ secrets.VITE_API_INVENTORY_URL }}" \
             --build-arg VITE_API_NOTIFICATION_URL="${{ secrets.VITE_API_NOTIFICATION_URL }}" \
+            --build-arg VITE_CLOUD_RUN_SUFFIX="${{ secrets.CLOUD_RUN_URL_SUFFIX }}" \
             ./app/frontend
           docker push $IMAGE
 
