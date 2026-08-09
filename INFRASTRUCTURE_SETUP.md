@@ -169,20 +169,54 @@ When these finish, your certificates will be safely saved in `infra/certbot_conf
 
 The environment is fully prepped! You have your runner, your secret `.env` files, and your SSL certificates.
 
-**To deploy the application:**
-Simply push a commit to the `main` branch on GitHub! 
+### Path-Based CI/CD Workflows
 
-**What happens next?**
-1. Our `deploy.yml` workflow triggers the self-hosted runner.
-2. It uses `rsync` to safely copy the new code to the VM without deleting your precious `.env` files or SSL certificates.
-3. It runs `docker compose -f docker-compose.staging.yml up --build -d`.
-4. Docker brings up the databases and **waits** (via Healthchecks) until they are fully initialized.
-5. Docker brings up the Node.js microservices.
-6. NGINX starts, finds the SSL certificates we generated earlier, and opens the floodgates to the internet!
+Instead of one monolithic workflow that rebuilds everything on every push, we use **4 independent GitHub Actions workflows** with path-based filtering. Each workflow only triggers when its relevant files change:
+
+| Workflow File | Triggers On | What It Does |
+|---|---|---|
+| `deploy-order.yml` | `app/order-service/**` | Rebuilds only the Order Service container |
+| `deploy-inventory.yml` | `app/inventory-service/**` | Rebuilds only the Inventory Service container |
+| `deploy-notification.yml` | `app/notification-service/**` | Rebuilds only the Notification Service container |
+| `deploy-infra.yml` | `infra/**` | Full stack rebuild (databases, NGINX, all services) |
+
+**How it works:**
+- Each service workflow uses `docker compose up --build -d --no-deps <service>` to rebuild **only** the changed service without touching databases or other services.
+- After rebuilding, it restarts NGINX to refresh its DNS cache for the new container IP.
+- The infra workflow does a full `docker compose up --build -d` since infrastructure changes (like `docker-compose.staging.yml` or `nginx/default.conf`) can affect the entire stack.
+- If a single commit touches multiple services, GitHub Actions will trigger multiple workflows in parallel. Since they run on the same self-hosted runner, they will be queued and executed one at a time.
+
+**To deploy:**
+Simply push a commit to the `main` branch. Only the workflows relevant to your changed files will run!
 
 ---
 
-## 🛠️ 7. Troubleshooting Cheatsheet
+## 🌐 7. NGINX Reverse Proxy & DNS Resolution
+
+NGINX acts as the single entry point to our infrastructure. It listens on ports `80` and `443`, terminates SSL, and routes traffic to the correct microservice based on the subdomain.
+
+### Dynamic DNS Resolution
+
+Our `nginx/default.conf` uses Docker's internal DNS resolver (`resolver 127.0.0.11`) with variable-based `proxy_pass` directives. This is critical because:
+
+1. When a container restarts, Docker assigns it a **new internal IP address**.
+2. By default, NGINX resolves hostnames only at startup and caches them forever.
+3. If a service restarts after NGINX, NGINX would still try to reach the **old, dead IP**, causing `502 Bad Gateway` errors.
+4. Using `set $upstream` variables forces NGINX to re-resolve the hostname on **every request**, ensuring it always finds the correct container.
+
+```nginx
+# This pattern ensures dynamic DNS resolution
+resolver 127.0.0.11 valid=10s;
+
+location / {
+    set $upstream_order http://order-service:3000;
+    proxy_pass $upstream_order;
+}
+```
+
+---
+
+## 🛠️ 8. Troubleshooting Cheatsheet
 
 If something goes wrong, use these commands on your VM to debug:
 
@@ -203,9 +237,27 @@ cd ~/Ephemeral-PR-Environments/infra
 docker compose -f docker-compose.staging.yml logs -f
 ```
 
+**Rebuild and restart a single service:**
+```bash
+cd ~/Ephemeral-PR-Environments/infra
+docker compose -f docker-compose.staging.yml up --build -d --no-deps order-service
+docker restart nginx-proxy
+```
+
 **Restart everything cleanly:**
 ```bash
 cd ~/Ephemeral-PR-Environments/infra
 docker compose -f docker-compose.staging.yml down
 docker compose -f docker-compose.staging.yml up -d
 ```
+
+**Check if a container was killed due to low memory (OOM):**
+```bash
+docker inspect infra-inventory-service-1 | grep OOMKilled
+```
+
+**Test if NGINX can reach a service internally:**
+```bash
+docker exec nginx-proxy wget -qO- http://order-service:3000/
+```
+
