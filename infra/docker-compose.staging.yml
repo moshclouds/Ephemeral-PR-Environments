@@ -56,6 +56,14 @@ services:
       mysql-db:
         condition: service_healthy
 
+  frontend:
+    image: ${GCP_AR_REPO}/frontend:staging
+    restart: unless-stopped
+    depends_on:
+      - order-service
+      - inventory-service
+      - notification-service
+
   notification-service:
     image: ${GCP_AR_REPO}/notification-service:staging
     restart: unless-stopped
