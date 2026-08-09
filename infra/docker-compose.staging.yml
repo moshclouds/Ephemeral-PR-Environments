@@ -39,8 +39,7 @@ services:
   # Applications
   # ==========================================
   order-service:
-    build:
-      context: ../app/order-service
+    image: ${GCP_AR_REPO}/order-service:staging
     restart: unless-stopped
     env_file:
       - ../app/order-service/.env
@@ -49,8 +48,7 @@ services:
         condition: service_healthy
 
   inventory-service:
-    build:
-      context: ../app/inventory-service
+    image: ${GCP_AR_REPO}/inventory-service:staging
     restart: unless-stopped
     env_file:
       - ../app/inventory-service/.env
@@ -59,8 +57,7 @@ services:
         condition: service_healthy
 
   notification-service:
-    build:
-      context: ../app/notification-service
+    image: ${GCP_AR_REPO}/notification-service:staging
     restart: unless-stopped
     env_file:
       - ../app/notification-service/.env

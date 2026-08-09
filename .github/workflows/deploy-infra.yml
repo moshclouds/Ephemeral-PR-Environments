@@ -8,10 +8,47 @@ on:
       - '.github/workflows/deploy-infra.yml'
 
 jobs:
+  # JOB 1: Build & Push All Services (Runs on GitHub Cloud Servers - FREE CPU/RAM)
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker Auth
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build & Push Order Image
+        run: |
+          IMAGE="${{ secrets.GCP_AR_REPO }}/order-service:staging"
+          docker build -t $IMAGE ./app/order-service
+          docker push $IMAGE
+
+      - name: Build & Push Inventory Image
+        run: |
+          IMAGE="${{ secrets.GCP_AR_REPO }}/inventory-service:staging"
+          docker build -t $IMAGE ./app/inventory-service
+          docker push $IMAGE
+
+      - name: Build & Push Notification Image
+        run: |
+          IMAGE="${{ secrets.GCP_AR_REPO }}/notification-service:staging"
+          docker build -t $IMAGE ./app/notification-service
+          docker push $IMAGE
+
+  # JOB 2: Deploy All (Runs on Staging VM)
   deploy:
+    needs: build-and-push
     runs-on: self-hosted
     environment: staging
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -19,10 +56,19 @@ jobs:
       - name: Sync Code to VM
         run: rsync -a --exclude='.git/' ./ ~/Ephemeral-PR-Environments/
 
-      - name: Rebuild & Restart All Services
+      - name: Pull and Restart All Containers
         run: |
           cd ~/Ephemeral-PR-Environments/infra
-          docker compose -f docker-compose.staging.yml up --build -d
-
+          
+          # Export the AR Repo URL so docker-compose can use it
+          export GCP_AR_REPO="${{ secrets.GCP_AR_REPO }}"
+          
+          # Ensure VM Docker is authenticated to pull from AR
+          gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+          
+          # Pull all images and start full stack
+          docker compose -f docker-compose.staging.yml pull
+          docker compose -f docker-compose.staging.yml up -d
+          
       - name: Docker Cleanup
         run: docker image prune -f
