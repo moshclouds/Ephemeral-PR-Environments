@@ -35,6 +35,9 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
+# Copy Prisma schema and migrations for auto-migration
+COPY --from=builder /app/prisma ./prisma
+
 # Start the application
 EXPOSE 3001
-CMD ["npm", "run", "start:prod"]
+CMD npx prisma migrate deploy && npm run start:prod
