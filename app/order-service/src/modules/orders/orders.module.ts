@@ -6,8 +6,10 @@ import { ORDERS_SERVICE_TOKEN } from './services/orders.service';
 import { OrdersRepository } from './repositories/orders.repository';
 import { PrismaService } from '../../core/config/prisma.service';
 
+import { PrHttpModule } from '../../core/http/pr-http.module';
+
 @Module({
-  imports: [HttpModule],
+  imports: [PrHttpModule],
   controllers: [OrdersController],
   providers: [
     PrismaService,
