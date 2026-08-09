@@ -1,0 +1,28 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/deploy-infra.yml'
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: staging
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Sync Code to VM
+        run: rsync -a --exclude='.git/' ./ ~/Ephemeral-PR-Environments/
+
+      - name: Rebuild & Restart All Services
+        run: |
+          cd ~/Ephemeral-PR-Environments/infra
+          docker compose -f docker-compose.staging.yml up --build -d
+
+      - name: Docker Cleanup
+        run: docker image prune -f
