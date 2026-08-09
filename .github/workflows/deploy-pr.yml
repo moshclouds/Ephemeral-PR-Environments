@@ -130,7 +130,7 @@ jobs:
           elif [ "${{ matrix.service }}" == "inventory-service" ]; then
             DB_ENV="DATABASE_URL=mysql://${{ secrets.MYSQL_USER }}:${{ secrets.MYSQL_PASSWORD }}@${VM_IP}:3306/inventory_db_pr_${PR_NUM}"
           elif [ "${{ matrix.service }}" == "notification-service" ]; then
-            DB_ENV="DATABASE_URL=mongodb://${VM_IP}:27017/notification_db_pr_${PR_NUM}?replicaSet=rs0"
+            DB_ENV="DATABASE_URL=mongodb://${VM_IP}:27017/notification_db_pr_${PR_NUM}?replicaSet=rs0&directConnection=true"
           fi
           
           gcloud run deploy $SERVICE_NAME \
