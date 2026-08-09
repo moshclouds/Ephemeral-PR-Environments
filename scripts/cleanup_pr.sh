@@ -9,7 +9,7 @@ if [ -z "$SERVICE_NAME" ] || [ -z "$PR_NUMBER" ]; then
   exit 1
 fi
 
-COMPOSE_CMD="docker compose -f infra/docker-compose.staging.yml"
+COMPOSE_CMD="docker compose -f infra/docker-compose.staging.yml --env-file infra/.env"
 
 echo "Cleaning up database for $SERVICE_NAME (PR #$PR_NUMBER)..."
 
