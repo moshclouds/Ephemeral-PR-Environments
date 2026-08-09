@@ -11,6 +11,7 @@ jobs:
   # JOB 1: Build & Push (Runs on GitHub Cloud Servers - FREE CPU/RAM)
   build-and-push:
     runs-on: ubuntu-latest
+    environment: staging
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -29,7 +30,11 @@ jobs:
       - name: Build & Push Docker Image
         run: |
           IMAGE="${{ secrets.GCP_AR_REPO }}/frontend:staging"
-          docker build -t $IMAGE ./app/frontend
+          docker build -t $IMAGE \
+            --build-arg VITE_API_ORDER_URL="${{ secrets.VITE_API_ORDER_URL }}" \
+            --build-arg VITE_API_INVENTORY_URL="${{ secrets.VITE_API_INVENTORY_URL }}" \
+            --build-arg VITE_API_NOTIFICATION_URL="${{ secrets.VITE_API_NOTIFICATION_URL }}" \
+            ./app/frontend
           docker push $IMAGE
 
   # JOB 2: Deploy (Runs on Staging VM)

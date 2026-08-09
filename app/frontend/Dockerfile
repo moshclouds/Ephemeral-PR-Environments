@@ -7,6 +7,16 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Declare build args for Vite environment variables
+ARG VITE_API_ORDER_URL
+ARG VITE_API_INVENTORY_URL
+ARG VITE_API_NOTIFICATION_URL
+
+# Bind them so they are available to Node/Vite during compile
+ENV VITE_API_ORDER_URL=$VITE_API_ORDER_URL
+ENV VITE_API_INVENTORY_URL=$VITE_API_INVENTORY_URL
+ENV VITE_API_NOTIFICATION_URL=$VITE_API_NOTIFICATION_URL
+
 # Copy source code and build
 COPY . .
 RUN npm run build
