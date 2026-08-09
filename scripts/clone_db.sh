@@ -9,7 +9,7 @@ if [ -z "$SERVICE_NAME" ] || [ -z "$PR_NUMBER" ]; then
   exit 1
 fi
 
-COMPOSE_CMD="docker compose -f infra/docker-compose.staging.yml --env-file ~/Ephemeral-PR-Environments/infra/.env"
+COMPOSE_CMD="docker compose -f infra/docker-compose.staging.yml --env-file $HOME/Ephemeral-PR-Environments/infra/.env"
 
 echo "Cloning database for $SERVICE_NAME (PR #$PR_NUMBER)..."
 
