@@ -165,10 +165,24 @@ jobs:
         with:
           script: |
             const feUrl = `https://client-web-app.ephemeral-poc.run.place${{ steps.params.outputs.query }}`;
+            const prNum = context.issue.number;
+            const suffix = '${{ secrets.CLOUD_RUN_URL_SUFFIX }}';
+            
+            let backendUrls = '';
+            if ('${{ needs.changes.outputs.order }}' === 'true') {
+              backendUrls += `- **Order Service:** [https://order-service-pr-${prNum}${suffix}](https://order-service-pr-${prNum}${suffix})\n`;
+            }
+            if ('${{ needs.changes.outputs.inventory }}' === 'true') {
+              backendUrls += `- **Inventory Service:** [https://inventory-service-pr-${prNum}${suffix}](https://inventory-service-pr-${prNum}${suffix})\n`;
+            }
+            if ('${{ needs.changes.outputs.notification }}' === 'true') {
+              backendUrls += `- **Notification Service:** [https://notification-service-pr-${prNum}${suffix}](https://notification-service-pr-${prNum}${suffix})\n`;
+            }
+
             const body = `🚀 **Ephemeral PR Environment Deployed!**\n\n` +
                          `Test your changes instantly using this link:\n` +
                          `👉 [**Open Frontend PR Dashboard**](${feUrl})\n\n` +
-                         `*The relevant Cloud Run backends have been spun up and isolated databases cloned.*`;
+                         `### Deployed Cloud Run Backends:\n` + backendUrls;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
