@@ -29,6 +29,11 @@ services:
 
   mongo-db:
     image: mongo:6-jammy
+    entrypoint: [
+      "/bin/sh",
+      "-c",
+      "mongod --replSet rs0 --bind_ip_all & MONGOD_PID=$$!; sleep 4; mongosh --eval 'rs.initiate()' || true; wait $$MONGOD_PID"
+    ]
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
