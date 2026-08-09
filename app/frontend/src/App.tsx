@@ -46,8 +46,10 @@ export default function App() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [loadingSku, setLoadingSku] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<ModalType>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const fetchData = async () => {
+  const fetchData = async (showLoader = false) => {
+    if (showLoader) setIsLoading(true)
     try {
       const [invRes, ordRes, notRes] = await Promise.all([
         api.get(`${INVENTORY_URL}/inventory`),
@@ -59,12 +61,25 @@ export default function App() {
       setNotifications(notRes.data)
     } catch (error) {
       console.error("Error fetching data:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchData()
+    fetchData(true)
   }, [])
+
+  const SkeletonCard = () => (
+    <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 flex flex-col justify-between animate-pulse">
+      <div>
+        <div className="h-5 bg-gray-700 rounded w-3/4 mb-3"></div>
+        <div className="h-3 bg-gray-700 rounded w-1/2 mb-2"></div>
+        <div className="h-3 bg-gray-700 rounded w-1/3"></div>
+      </div>
+      <div className="mt-4 h-10 bg-gray-700 rounded-lg w-full"></div>
+    </div>
+  )
 
   const handleBuy = async (sku: string) => {
     setLoadingSku(sku)
@@ -119,28 +134,34 @@ export default function App() {
         <h2 className="text-2xl font-bold">Inventory</h2>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        {inventory.map((item) => (
-          <div
-            key={item.id}
-            className="bg-gray-800 border border-gray-700 rounded-xl p-5 flex flex-col justify-between hover:border-blue-500/50 transition-all"
-          >
-            <div>
-              <h3 className="font-bold text-lg mb-1">{item.name}</h3>
-              <p className="text-sm text-gray-400">SKU: <span className="text-blue-300">{item.sku}</span></p>
-              <p className="text-sm text-gray-400 mt-1">
-                Stock: <span className={`font-semibold ${item.availableQuantity < 20 ? 'text-red-400' : 'text-emerald-400'}`}>{item.availableQuantity}</span>
-              </p>
-            </div>
-            <button
-              onClick={() => handleBuy(item.sku)}
-              disabled={loadingSku === item.sku || item.availableQuantity === 0}
-              className="mt-4 w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {loadingSku === item.sku ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buy Now'}
-            </button>
-          </div>
-        ))}
-        {inventory.length === 0 && <p className="text-gray-500 col-span-full">No inventory found.</p>}
+        {isLoading ? (
+          <>{Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}</>
+        ) : (
+          <>
+            {inventory.map((item) => (
+              <div
+                key={item.id}
+                className="bg-gray-800 border border-gray-700 rounded-xl p-5 flex flex-col justify-between hover:border-blue-500/50 transition-all"
+              >
+                <div>
+                  <h3 className="font-bold text-lg mb-1">{item.name}</h3>
+                  <p className="text-sm text-gray-400">SKU: <span className="text-blue-300">{item.sku}</span></p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Stock: <span className={`font-semibold ${item.availableQuantity < 20 ? 'text-red-400' : 'text-emerald-400'}`}>{item.availableQuantity}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleBuy(item.sku)}
+                  disabled={loadingSku === item.sku || item.availableQuantity === 0}
+                  className="mt-4 w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {loadingSku === item.sku ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buy Now'}
+                </button>
+              </div>
+            ))}
+            {inventory.length === 0 && <p className="text-gray-500 col-span-full">No inventory found.</p>}
+          </>
+        )}
       </div>
 
       {/* Modal Overlay */}
