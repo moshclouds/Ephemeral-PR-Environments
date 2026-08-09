@@ -141,13 +141,13 @@ jobs:
           DEPLOY_FLAGS=""
           if [ "${{ matrix.service }}" == "order-service" ]; then
             DB_ENV="DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@${VM_IP}:5432/order_db_pr_${PR_NUM}"
-            DEPLOY_FLAGS="--vpc-egress all-traffic --network default --subnet default --set-env-vars $DB_ENV --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
           elif [ "${{ matrix.service }}" == "inventory-service" ]; then
             DB_ENV="DATABASE_URL=mysql://${{ secrets.MYSQL_USER }}:${{ secrets.MYSQL_PASSWORD }}@${VM_IP}:3306/inventory_db_pr_${PR_NUM}"
-            DEPLOY_FLAGS="--vpc-egress all-traffic --network default --subnet default --set-env-vars $DB_ENV --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
           elif [ "${{ matrix.service }}" == "notification-service" ]; then
             DB_ENV="DATABASE_URL=mongodb://${VM_IP}:27017/notification_db_pr_${PR_NUM}?replicaSet=rs0&directConnection=true"
-            DEPLOY_FLAGS="--vpc-egress all-traffic --network default --subnet default --set-env-vars $DB_ENV --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
           fi
           
           gcloud run deploy $SERVICE_NAME \
