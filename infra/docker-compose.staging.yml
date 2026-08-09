@@ -36,7 +36,7 @@ services:
     entrypoint: [
       "/bin/sh",
       "-c",
-      "mongod --replSet rs0 --bind_ip_all & MONGOD_PID=$$!; sleep 4; mongosh --eval 'rs.initiate()' || true; wait $$MONGOD_PID"
+      "mongod --replSet rs0 --bind_ip_all & MONGOD_PID=$$!; sleep 4; mongosh --eval 'rs.initiate({_id: \"rs0\", members: [{_id: 0, host: \"mongo-db:27017\"}]})' || true; wait $$MONGOD_PID"
     ]
     ports:
       - "27017:27017"
