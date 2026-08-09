@@ -28,13 +28,17 @@ RUN apk add --no-cache openssl
 COPY package*.json ./
 RUN npm install --omit=dev
 
-# Copy generated Prisma Client from builder
+# Copy generated Prisma Client and Prisma CLI from builder
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
+# Copy Prisma schema and migrations for auto-migration
+COPY --from=builder /app/prisma ./prisma
+
 # Start the application
 EXPOSE 3001
-CMD ["npm", "run", "start:prod"]
+CMD npx prisma migrate deploy && npm run start:prod

@@ -26,6 +26,7 @@ jobs:
           gcloud run services delete order-service-pr-${{ github.event.pull_request.number }} --region=us-central1 --quiet || true
           gcloud run services delete inventory-service-pr-${{ github.event.pull_request.number }} --region=us-central1 --quiet || true
           gcloud run services delete notification-service-pr-${{ github.event.pull_request.number }} --region=us-central1 --quiet || true
+          gcloud run services delete frontend-pr-${{ github.event.pull_request.number }} --region=us-central1 --quiet || true
 
   # Job 2: Identify changed services
   changes:
@@ -80,7 +81,7 @@ jobs:
     environment: staging
     strategy:
       matrix:
-        service: [order-service, inventory-service, notification-service]
+        service: [order-service, inventory-service, notification-service, frontend]
         include:
           - service: order-service
             changed: ${{ needs.changes.outputs.order }}
@@ -91,6 +92,9 @@ jobs:
           - service: notification-service
             changed: ${{ needs.changes.outputs.notification }}
             port: 3002
+          - service: frontend
+            changed: ${{ needs.changes.outputs.frontend }}
+            port: 80
     steps:
       - name: Checkout Code
         if: matrix.changed == 'true'
@@ -114,7 +118,16 @@ jobs:
         if: matrix.changed == 'true'
         run: |
           IMAGE="${{ secrets.GCP_AR_REPO }}/${{ matrix.service }}:pr-${{ github.event.pull_request.number }}"
-          docker build -t $IMAGE ./app/${{ matrix.service }}
+          if [ "${{ matrix.service }}" == "frontend" ]; then
+            docker build \
+              --build-arg VITE_CLOUD_RUN_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }} \
+              --build-arg VITE_API_ORDER_URL=${{ secrets.VITE_API_ORDER_URL }} \
+              --build-arg VITE_API_INVENTORY_URL=${{ secrets.VITE_API_INVENTORY_URL }} \
+              --build-arg VITE_API_NOTIFICATION_URL=${{ secrets.VITE_API_NOTIFICATION_URL }} \
+              -t $IMAGE ./app/${{ matrix.service }}
+          else
+            docker build -t $IMAGE ./app/${{ matrix.service }}
+          fi
           docker push $IMAGE
 
       - name: Deploy to Cloud Run
@@ -125,24 +138,24 @@ jobs:
           PR_NUM="${{ github.event.pull_request.number }}"
           VM_IP="${{ secrets.VM_INTERNAL_IP }}"
           
+          DEPLOY_FLAGS=""
           if [ "${{ matrix.service }}" == "order-service" ]; then
             DB_ENV="DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@${VM_IP}:5432/order_db_pr_${PR_NUM}"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }} --set-env-vars INVENTORY_SERVICE_URL=${{ secrets.VITE_API_INVENTORY_URL }} --set-env-vars NOTIFICATION_SERVICE_URL=${{ secrets.VITE_API_NOTIFICATION_URL }}"
           elif [ "${{ matrix.service }}" == "inventory-service" ]; then
             DB_ENV="DATABASE_URL=mysql://${{ secrets.MYSQL_USER }}:${{ secrets.MYSQL_PASSWORD }}@${VM_IP}:3306/inventory_db_pr_${PR_NUM}"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
           elif [ "${{ matrix.service }}" == "notification-service" ]; then
             DB_ENV="DATABASE_URL=mongodb://${VM_IP}:27017/notification_db_pr_${PR_NUM}?replicaSet=rs0&directConnection=true"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
           fi
           
           gcloud run deploy $SERVICE_NAME \
             --image $IMAGE \
             --region us-central1 \
             --port ${{ matrix.port }} \
-            --vpc-egress all-traffic \
-            --network default \
-            --subnet default \
             --allow-unauthenticated \
-            --set-env-vars "$DB_ENV" \
-            --set-env-vars "CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
+            $DEPLOY_FLAGS
 
   # Job 5: Post PR Comment
   post-comment:
@@ -164,11 +177,36 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const feUrl = `https://client-web-app.ephemeral-poc.run.place${{ steps.params.outputs.query }}`;
+            const prNum = context.issue.number;
+            const suffix = '${{ secrets.CLOUD_RUN_URL_SUFFIX }}';
+            const frontendChanged = '${{ needs.changes.outputs.frontend }}' === 'true';
+            
+            // If frontend changed, link to the ephemeral frontend; otherwise, link to staging with query params
+            let feUrl;
+            if (frontendChanged) {
+              feUrl = `https://frontend-pr-${prNum}${suffix}${{ steps.params.outputs.query }}`;
+            } else {
+              feUrl = `https://client-web-app.ephemeral-poc.run.place${{ steps.params.outputs.query }}`;
+            }
+            
+            let deployedServices = '';
+            if (frontendChanged) {
+              deployedServices += `- **Frontend:** [https://frontend-pr-${prNum}${suffix}](https://frontend-pr-${prNum}${suffix})\n`;
+            }
+            if ('${{ needs.changes.outputs.order }}' === 'true') {
+              deployedServices += `- **Order Service:** [https://order-service-pr-${prNum}${suffix}](https://order-service-pr-${prNum}${suffix})\n`;
+            }
+            if ('${{ needs.changes.outputs.inventory }}' === 'true') {
+              deployedServices += `- **Inventory Service:** [https://inventory-service-pr-${prNum}${suffix}](https://inventory-service-pr-${prNum}${suffix})\n`;
+            }
+            if ('${{ needs.changes.outputs.notification }}' === 'true') {
+              deployedServices += `- **Notification Service:** [https://notification-service-pr-${prNum}${suffix}](https://notification-service-pr-${prNum}${suffix})\n`;
+            }
+
             const body = `🚀 **Ephemeral PR Environment Deployed!**\n\n` +
                          `Test your changes instantly using this link:\n` +
                          `👉 [**Open Frontend PR Dashboard**](${feUrl})\n\n` +
-                         `*The relevant Cloud Run backends have been spun up and isolated databases cloned.*`;
+                         `### Deployed Cloud Run Services:\n` + deployedServices;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
