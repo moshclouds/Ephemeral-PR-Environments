@@ -1,0 +1,26 @@
+name: Deploy Notification Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/notification-service/**'
+      - '.github/workflows/deploy-notification.yml'
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: staging
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Sync Code to VM
+        run: rsync -a --exclude='.git/' ./ ~/Ephemeral-PR-Environments/
+
+      - name: Rebuild & Restart Notification Service
+        run: |
+          cd ~/Ephemeral-PR-Environments/infra
+          docker compose -f docker-compose.staging.yml up --build -d --no-deps notification-service
+          docker restart nginx-proxy

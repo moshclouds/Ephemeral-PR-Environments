@@ -1,0 +1,26 @@
+name: Deploy Order Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/order-service/**'
+      - '.github/workflows/deploy-order.yml'
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: staging
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Sync Code to VM
+        run: rsync -a --exclude='.git/' ./ ~/Ephemeral-PR-Environments/
+
+      - name: Rebuild & Restart Order Service
+        run: |
+          cd ~/Ephemeral-PR-Environments/infra
+          docker compose -f docker-compose.staging.yml up --build -d --no-deps order-service
+          docker restart nginx-proxy
