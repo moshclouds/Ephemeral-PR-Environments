@@ -85,15 +85,12 @@ jobs:
           - service: order-service
             changed: ${{ needs.changes.outputs.order }}
             port: 3000
-            db_env: DATABASE_URL="postgresql://user:password@${{ secrets.VM_INTERNAL_IP }}:5432/order_db_pr_${{ github.event.pull_request.number }}"
           - service: inventory-service
             changed: ${{ needs.changes.outputs.inventory }}
             port: 3001
-            db_env: DATABASE_URL="mysql://root:password@${{ secrets.VM_INTERNAL_IP }}:3306/inventory_db_pr_${{ github.event.pull_request.number }}"
           - service: notification-service
             changed: ${{ needs.changes.outputs.notification }}
             port: 3002
-            db_env: DATABASE_URL="mongodb://${{ secrets.VM_INTERNAL_IP }}:27017/notification_db_pr_${{ github.event.pull_request.number }}?replicaSet=rs0"
     steps:
       - name: Checkout Code
         if: matrix.changed == 'true'
@@ -125,6 +122,16 @@ jobs:
         run: |
           IMAGE="${{ secrets.GCP_AR_REPO }}/${{ matrix.service }}:pr-${{ github.event.pull_request.number }}"
           SERVICE_NAME="${{ matrix.service }}-pr-${{ github.event.pull_request.number }}"
+          PR_NUM="${{ github.event.pull_request.number }}"
+          VM_IP="${{ secrets.VM_INTERNAL_IP }}"
+          
+          if [ "${{ matrix.service }}" == "order-service" ]; then
+            DB_ENV="DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@${VM_IP}:5432/order_db_pr_${PR_NUM}"
+          elif [ "${{ matrix.service }}" == "inventory-service" ]; then
+            DB_ENV="DATABASE_URL=mysql://${{ secrets.MYSQL_USER }}:${{ secrets.MYSQL_PASSWORD }}@${VM_IP}:3306/inventory_db_pr_${PR_NUM}"
+          elif [ "${{ matrix.service }}" == "notification-service" ]; then
+            DB_ENV="DATABASE_URL=mongodb://${VM_IP}:27017/notification_db_pr_${PR_NUM}?replicaSet=rs0"
+          fi
           
           gcloud run deploy $SERVICE_NAME \
             --image $IMAGE \
@@ -134,7 +141,7 @@ jobs:
             --network default \
             --subnet default \
             --allow-unauthenticated \
-            --set-env-vars "${{ matrix.db_env }}" \
+            --set-env-vars "$DB_ENV" \
             --set-env-vars "CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
 
   # Job 5: Post PR Comment

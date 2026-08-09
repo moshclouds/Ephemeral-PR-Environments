@@ -17,13 +17,13 @@ case "$SERVICE_NAME" in
   order-service)
     TARGET_DB="order_db_pr_${PR_NUMBER}"
     echo "Dropping Postgres DB: $TARGET_DB"
-    $COMPOSE_CMD exec -T postgres-db psql -U user -d postgres -c "DROP DATABASE IF EXISTS ${TARGET_DB};"
+    $COMPOSE_CMD exec -T postgres-db psql -U ${POSTGRES_USER:-user} -d postgres -c "DROP DATABASE IF EXISTS ${TARGET_DB};"
     echo "Successfully cleaned up Postgres DB"
     ;;
   inventory-service)
     TARGET_DB="inventory_db_pr_${PR_NUMBER}"
     echo "Dropping MySQL DB: $TARGET_DB"
-    $COMPOSE_CMD exec -T mysql-db mysql -uroot -ppassword -e "DROP DATABASE IF EXISTS ${TARGET_DB};"
+    $COMPOSE_CMD exec -T mysql-db mysql -u${MYSQL_USER:-root} -p${MYSQL_PASSWORD:-password} -e "DROP DATABASE IF EXISTS ${TARGET_DB};"
     echo "Successfully cleaned up MySQL DB"
     ;;
   notification-service)
