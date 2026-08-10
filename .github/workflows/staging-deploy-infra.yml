@@ -1,17 +1,16 @@
-name: Deploy Frontend Service
+name: Deploy Infrastructure
 
 on:
   push:
     branches: [main]
     paths:
-      - 'app/frontend/**'
-      - '.github/workflows/deploy-frontend.yml'
+      - 'infra/**'
+      - '.github/workflows/staging-deploy-infra.yml'
 
 jobs:
-  # JOB 1: Build & Push (Runs on GitHub Cloud Servers - FREE CPU/RAM)
+  # JOB 1: Build & Push All Services (Runs on GitHub Cloud Servers - FREE CPU/RAM)
   build-and-push:
     runs-on: ubuntu-latest
-    environment: staging
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -27,18 +26,25 @@ jobs:
       - name: Configure Docker Auth
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      - name: Build & Push Docker Image
+      - name: Build & Push Order Image
         run: |
-          IMAGE="${{ secrets.GCP_AR_REPO }}/frontend:staging"
-          docker build -t $IMAGE \
-            --build-arg VITE_API_ORDER_URL="${{ secrets.VITE_API_ORDER_URL }}" \
-            --build-arg VITE_API_INVENTORY_URL="${{ secrets.VITE_API_INVENTORY_URL }}" \
-            --build-arg VITE_API_NOTIFICATION_URL="${{ secrets.VITE_API_NOTIFICATION_URL }}" \
-            --build-arg VITE_CLOUD_RUN_SUFFIX="${{ secrets.CLOUD_RUN_URL_SUFFIX }}" \
-            ./app/frontend
+          IMAGE="${{ secrets.GCP_AR_REPO }}/order-service:staging"
+          docker build -t $IMAGE ./app/order-service
           docker push $IMAGE
 
-  # JOB 2: Deploy (Runs on Staging VM)
+      - name: Build & Push Inventory Image
+        run: |
+          IMAGE="${{ secrets.GCP_AR_REPO }}/inventory-service:staging"
+          docker build -t $IMAGE ./app/inventory-service
+          docker push $IMAGE
+
+      - name: Build & Push Notification Image
+        run: |
+          IMAGE="${{ secrets.GCP_AR_REPO }}/notification-service:staging"
+          docker build -t $IMAGE ./app/notification-service
+          docker push $IMAGE
+
+  # JOB 2: Deploy All (Runs on Staging VM)
   deploy:
     needs: build-and-push
     runs-on: self-hosted
@@ -50,7 +56,7 @@ jobs:
       - name: Sync Code to VM
         run: rsync -a --exclude='.git/' ./ ~/Ephemeral-PR-Environments/
 
-      - name: Pull and Restart Container
+      - name: Pull and Restart All Containers
         run: |
           cd ~/Ephemeral-PR-Environments/infra
           
@@ -60,7 +66,9 @@ jobs:
           # Ensure VM Docker is authenticated to pull from AR
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
           
-          # Pull the new image and restart only frontend
-          docker compose -f docker-compose.staging.yml pull frontend
-          docker compose -f docker-compose.staging.yml up -d --no-deps frontend
-          docker restart nginx-proxy
+          # Pull all images and start full stack
+          docker compose -f docker-compose.staging.yml pull
+          docker compose -f docker-compose.staging.yml up -d
+          
+      - name: Docker Cleanup
+        run: docker image prune -f

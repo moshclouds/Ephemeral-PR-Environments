@@ -10,7 +10,7 @@ jobs:
   # 1. Cleanup on close
   cleanup:
     if: github.event.action == 'closed'
-    uses: ./.github/workflows/job-cleanup.yml
+    uses: ./.github/workflows/pr-job-cleanup.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
     secrets: inherit
@@ -18,14 +18,14 @@ jobs:
   # 2. Identify Changes
   changes:
     if: github.event.action != 'closed'
-    uses: ./.github/workflows/job-changes.yml
+    uses: ./.github/workflows/pr-job-changes.yml
     secrets: inherit
 
   # 3. Clone Databases
   clone-db:
     if: github.event.action != 'closed'
     needs: changes
-    uses: ./.github/workflows/job-clone-db.yml
+    uses: ./.github/workflows/pr-job-clone-db.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
       order_changed: ${{ needs.changes.outputs.order }}
@@ -37,7 +37,7 @@ jobs:
   build:
     if: github.event.action != 'closed'
     needs: changes
-    uses: ./.github/workflows/job-build.yml
+    uses: ./.github/workflows/pr-job-build.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
       order_changed: ${{ needs.changes.outputs.order }}
@@ -50,7 +50,7 @@ jobs:
   deploy:
     if: github.event.action != 'closed'
     needs: [changes, build, clone-db]
-    uses: ./.github/workflows/job-deploy.yml
+    uses: ./.github/workflows/pr-job-deploy.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
       order_changed: ${{ needs.changes.outputs.order }}
@@ -63,7 +63,7 @@ jobs:
   comment:
     if: github.event.action != 'closed'
     needs: [changes, deploy]
-    uses: ./.github/workflows/job-comment.yml
+    uses: ./.github/workflows/pr-job-comment.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
       order_changed: ${{ needs.changes.outputs.order }}
