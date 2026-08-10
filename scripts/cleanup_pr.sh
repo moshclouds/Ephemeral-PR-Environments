@@ -17,6 +17,8 @@ case "$SERVICE_NAME" in
   order-service)
     TARGET_DB="order_db_pr_${PR_NUMBER}"
     echo "Dropping Postgres DB: $TARGET_DB"
+    echo "Force-disconnecting active sessions from $TARGET_DB..."
+    $COMPOSE_CMD exec -T postgres-db psql -U ${POSTGRES_USER:-user} -d postgres -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '${TARGET_DB}' AND pid <> pg_backend_pid();"
     $COMPOSE_CMD exec -T postgres-db psql -U ${POSTGRES_USER:-user} -d postgres -c "DROP DATABASE IF EXISTS ${TARGET_DB};"
     echo "Successfully cleaned up Postgres DB"
     ;;
