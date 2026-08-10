@@ -55,11 +55,11 @@ jobs:
           # 1. Source (load) credentials dynamically from the VM's file system
           export $(grep -v '^#' $HOME/Ephemeral-PR-Environments/infra/.env | xargs)
           
-          # 2. Load service-level envs, but strip out 'DATABASE_URL' to prevent conflict
+          # 2. Load service-level envs, but strip out 'DATABASE_URL' and 'PORT' to prevent conflict
           SERVICE_ENV_FILE="$HOME/Ephemeral-PR-Environments/app/${{ matrix.service }}/.env"
           
           if [ -f "$SERVICE_ENV_FILE" ]; then
-            SERVICE_ENVS=$(grep -v '^#' "$SERVICE_ENV_FILE" | grep -v '^$' | grep -v '^DATABASE_URL=' | paste -sd "," -)
+            SERVICE_ENVS=$(grep -v '^#' "$SERVICE_ENV_FILE" | grep -v '^$' | grep -v '^DATABASE_URL=' | grep -v '^PORT=' | paste -sd "," -)
           else
             SERVICE_ENVS=""
           fi
