@@ -2,11 +2,15 @@
 
 The **Ephemeral PR Environments** Proof of Concept (POC) repository demonstrates a highly advanced, cost-effective, and scalable approach to spinning up complete microservice environments dynamically for every GitHub Pull Request.
 
-## 🌟 The Vision
+## 🌟 The Vision: True Isolated Testing
 
-Traditionally, spinning up a full staging environment for every PR is incredibly expensive and slow. You either have to provision new database servers, or you run the entire stack in massive Kubernetes clusters.
+The primary goal of this architecture is to provide **Isolated Testing** for every single pull request, inspired by the modern "Preview Branches" paradigm. 
 
-This POC solves that by implementing a **Hybrid Cloud Architecture**:
+When a developer works on a feature, they shouldn't have to share a staging environment where their disruptive database migrations or experimental code might block other engineers. They need a complete, sandboxed environment tailored exactly to their git branch. 
+
+However, traditionally spinning up a full, isolated replica (with dedicated databases and compute clusters) for *every* PR is incredibly expensive and slow.
+
+This POC solves the cost-speed barrier to isolated testing by implementing a **Hybrid Cloud Architecture**:
 1. **Serverless Compute (Zero Idle Cost):** The actual microservices (Frontend, Order, Inventory, Notification) deploy to **Google Cloud Run**. They scale to zero when not actively being tested.
 2. **Shared State (Low Cost Anchor):** All databases (Postgres, MySQL, MongoDB) run on a single, affordable Compute Engine VM.
 3. **Dynamic Routing (The Magic):** We only deploy the services that *changed* in the PR. For any service that didn't change, we dynamically route traffic back to the persistent staging environment.
