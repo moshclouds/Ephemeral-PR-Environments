@@ -1,16 +1,17 @@
-name: Deploy Notification Service
+name: Deploy Frontend Service
 
 on:
   push:
     branches: [main]
     paths:
-      - 'app/notification-service/**'
-      - '.github/workflows/deploy-notification.yml'
+      - 'app/frontend/**'
+      - '.github/workflows/staging-deploy-frontend.yml'
 
 jobs:
   # JOB 1: Build & Push (Runs on GitHub Cloud Servers - FREE CPU/RAM)
   build-and-push:
     runs-on: ubuntu-latest
+    environment: staging
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -28,8 +29,13 @@ jobs:
 
       - name: Build & Push Docker Image
         run: |
-          IMAGE="${{ secrets.GCP_AR_REPO }}/notification-service:staging"
-          docker build -t $IMAGE ./app/notification-service
+          IMAGE="${{ secrets.GCP_AR_REPO }}/frontend:staging"
+          docker build -t $IMAGE \
+            --build-arg VITE_API_ORDER_URL="${{ secrets.VITE_API_ORDER_URL }}" \
+            --build-arg VITE_API_INVENTORY_URL="${{ secrets.VITE_API_INVENTORY_URL }}" \
+            --build-arg VITE_API_NOTIFICATION_URL="${{ secrets.VITE_API_NOTIFICATION_URL }}" \
+            --build-arg VITE_CLOUD_RUN_SUFFIX="${{ secrets.CLOUD_RUN_URL_SUFFIX }}" \
+            ./app/frontend
           docker push $IMAGE
 
   # JOB 2: Deploy (Runs on Staging VM)
@@ -54,7 +60,7 @@ jobs:
           # Ensure VM Docker is authenticated to pull from AR
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
           
-          # Pull the new image and restart only notification-service
-          docker compose -f docker-compose.staging.yml pull notification-service
-          docker compose -f docker-compose.staging.yml up -d --no-deps notification-service
+          # Pull the new image and restart only frontend
+          docker compose -f docker-compose.staging.yml pull frontend
+          docker compose -f docker-compose.staging.yml up -d --no-deps frontend
           docker restart nginx-proxy

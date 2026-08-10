@@ -1,0 +1,73 @@
+name: PR Lifecycle
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  # 1. Cleanup on close
+  cleanup:
+    if: github.event.action == 'closed'
+    uses: ./.github/workflows/pr-job-cleanup.yml
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+    secrets: inherit
+
+  # 2. Identify Changes
+  changes:
+    if: github.event.action != 'closed'
+    uses: ./.github/workflows/pr-job-changes.yml
+    secrets: inherit
+
+  # 3. Clone Databases
+  clone-db:
+    if: github.event.action != 'closed'
+    needs: changes
+    uses: ./.github/workflows/pr-job-clone-db.yml
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      order_changed: ${{ needs.changes.outputs.order }}
+      inventory_changed: ${{ needs.changes.outputs.inventory }}
+      notification_changed: ${{ needs.changes.outputs.notification }}
+    secrets: inherit
+
+  # 4. Build & Push Images
+  build:
+    if: github.event.action != 'closed'
+    needs: changes
+    uses: ./.github/workflows/pr-job-build.yml
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      order_changed: ${{ needs.changes.outputs.order }}
+      inventory_changed: ${{ needs.changes.outputs.inventory }}
+      notification_changed: ${{ needs.changes.outputs.notification }}
+      frontend_changed: ${{ needs.changes.outputs.frontend }}
+    secrets: inherit
+
+  # 5. Deploy to Cloud Run
+  deploy:
+    if: github.event.action != 'closed'
+    needs: [changes, build, clone-db]
+    uses: ./.github/workflows/pr-job-deploy.yml
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      order_changed: ${{ needs.changes.outputs.order }}
+      inventory_changed: ${{ needs.changes.outputs.inventory }}
+      notification_changed: ${{ needs.changes.outputs.notification }}
+      frontend_changed: ${{ needs.changes.outputs.frontend }}
+    secrets: inherit
+
+  # 6. Post GitHub Comment
+  comment:
+    if: github.event.action != 'closed'
+    needs: [changes, deploy]
+    uses: ./.github/workflows/pr-job-comment.yml
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      order_changed: ${{ needs.changes.outputs.order }}
+      inventory_changed: ${{ needs.changes.outputs.inventory }}
+      notification_changed: ${{ needs.changes.outputs.notification }}
+      frontend_changed: ${{ needs.changes.outputs.frontend }}
+    secrets: inherit

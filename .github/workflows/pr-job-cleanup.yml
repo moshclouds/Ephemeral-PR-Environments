@@ -1,0 +1,29 @@
+name: Cleanup Job
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        description: "Pull Request Number"
+        required: true
+        type: number
+
+jobs:
+  cleanup-pr:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: Cleanup Databases
+        run: |
+          bash ./scripts/cleanup_pr.sh order-service ${{ inputs.pr_number }} || true
+          bash ./scripts/cleanup_pr.sh inventory-service ${{ inputs.pr_number }} || true
+          bash ./scripts/cleanup_pr.sh notification-service ${{ inputs.pr_number }} || true
+          
+      - name: Delete Cloud Run Services
+        run: |
+          gcloud run services delete order-service-pr-${{ inputs.pr_number }} --region=us-central1 --quiet || true
+          gcloud run services delete inventory-service-pr-${{ inputs.pr_number }} --region=us-central1 --quiet || true
+          gcloud run services delete notification-service-pr-${{ inputs.pr_number }} --region=us-central1 --quiet || true
+          gcloud run services delete frontend-pr-${{ inputs.pr_number }} --region=us-central1 --quiet || true

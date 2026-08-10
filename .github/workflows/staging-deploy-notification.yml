@@ -1,14 +1,14 @@
-name: Deploy Infrastructure
+name: Deploy Notification Service
 
 on:
   push:
     branches: [main]
     paths:
-      - 'infra/**'
-      - '.github/workflows/deploy-infra.yml'
+      - 'app/notification-service/**'
+      - '.github/workflows/staging-deploy-notification.yml'
 
 jobs:
-  # JOB 1: Build & Push All Services (Runs on GitHub Cloud Servers - FREE CPU/RAM)
+  # JOB 1: Build & Push (Runs on GitHub Cloud Servers - FREE CPU/RAM)
   build-and-push:
     runs-on: ubuntu-latest
     steps:
@@ -26,25 +26,13 @@ jobs:
       - name: Configure Docker Auth
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      - name: Build & Push Order Image
-        run: |
-          IMAGE="${{ secrets.GCP_AR_REPO }}/order-service:staging"
-          docker build -t $IMAGE ./app/order-service
-          docker push $IMAGE
-
-      - name: Build & Push Inventory Image
-        run: |
-          IMAGE="${{ secrets.GCP_AR_REPO }}/inventory-service:staging"
-          docker build -t $IMAGE ./app/inventory-service
-          docker push $IMAGE
-
-      - name: Build & Push Notification Image
+      - name: Build & Push Docker Image
         run: |
           IMAGE="${{ secrets.GCP_AR_REPO }}/notification-service:staging"
           docker build -t $IMAGE ./app/notification-service
           docker push $IMAGE
 
-  # JOB 2: Deploy All (Runs on Staging VM)
+  # JOB 2: Deploy (Runs on Staging VM)
   deploy:
     needs: build-and-push
     runs-on: self-hosted
@@ -56,7 +44,7 @@ jobs:
       - name: Sync Code to VM
         run: rsync -a --exclude='.git/' ./ ~/Ephemeral-PR-Environments/
 
-      - name: Pull and Restart All Containers
+      - name: Pull and Restart Container
         run: |
           cd ~/Ephemeral-PR-Environments/infra
           
@@ -66,9 +54,7 @@ jobs:
           # Ensure VM Docker is authenticated to pull from AR
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
           
-          # Pull all images and start full stack
-          docker compose -f docker-compose.staging.yml pull
-          docker compose -f docker-compose.staging.yml up -d
-          
-      - name: Docker Cleanup
-        run: docker image prune -f
+          # Pull the new image and restart only notification-service
+          docker compose -f docker-compose.staging.yml pull notification-service
+          docker compose -f docker-compose.staging.yml up -d --no-deps notification-service
+          docker restart nginx-proxy

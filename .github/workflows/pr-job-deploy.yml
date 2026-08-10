@@ -1,0 +1,85 @@
+name: Deploy Job
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        description: "Pull Request Number"
+        required: true
+        type: number
+      order_changed:
+        description: "Order service changed"
+        required: true
+        type: string
+      inventory_changed:
+        description: "Inventory service changed"
+        required: true
+        type: string
+      notification_changed:
+        description: "Notification service changed"
+        required: true
+        type: string
+      frontend_changed:
+        description: "Frontend changed"
+        required: true
+        type: string
+
+jobs:
+  deploy-pr:
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        service: [order-service, inventory-service, notification-service, frontend]
+        include:
+          - service: order-service
+            changed: ${{ inputs.order_changed }}
+            port: 3000
+          - service: inventory-service
+            changed: ${{ inputs.inventory_changed }}
+            port: 3001
+          - service: notification-service
+            changed: ${{ inputs.notification_changed }}
+            port: 3002
+          - service: frontend
+            changed: ${{ inputs.frontend_changed }}
+            port: 80
+    steps:
+      - name: Deploy to Cloud Run
+        if: matrix.changed == 'true'
+        run: |
+          IMAGE="${{ secrets.GCP_AR_REPO }}/${{ matrix.service }}:pr-${{ inputs.pr_number }}"
+          SERVICE_NAME="${{ matrix.service }}-pr-${{ inputs.pr_number }}"
+          PR_NUM="${{ inputs.pr_number }}"
+          VM_IP="${{ secrets.VM_INTERNAL_IP }}"
+          
+          # 1. Source (load) credentials dynamically from the VM's file system
+          export $(grep -v '^#' $HOME/Ephemeral-PR-Environments/infra/.env | xargs)
+          
+          # 2. Load service-level envs, but strip out 'DATABASE_URL' and 'PORT' to prevent conflict
+          SERVICE_ENV_FILE="$HOME/Ephemeral-PR-Environments/app/${{ matrix.service }}/.env"
+          
+          if [ -f "$SERVICE_ENV_FILE" ]; then
+            SERVICE_ENVS=$(grep -v '^#' "$SERVICE_ENV_FILE" | grep -v '^$' | grep -v '^DATABASE_URL=' | grep -v '^PORT=' | paste -sd "," -)
+          else
+            SERVICE_ENVS=""
+          fi
+          
+          DEPLOY_FLAGS=""
+          if [ "${{ matrix.service }}" == "order-service" ]; then
+            DB_ENV="DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@${VM_IP}:5432/order_db_pr_${PR_NUM}"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV,$SERVICE_ENVS --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
+          elif [ "${{ matrix.service }}" == "inventory-service" ]; then
+            DB_ENV="DATABASE_URL=mysql://root:$MYSQL_ROOT_PASSWORD@${VM_IP}:3306/inventory_db_pr_${PR_NUM}"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV,$SERVICE_ENVS --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
+          elif [ "${{ matrix.service }}" == "notification-service" ]; then
+            DB_ENV="DATABASE_URL=mongodb://${VM_IP}:27017/notification_db_pr_${PR_NUM}?replicaSet=rs0&directConnection=true"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV,$SERVICE_ENVS --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
+          fi
+          
+          # 3. Deploy (gcloud is ambiently authenticated on the VM; no GCP_SA_KEY auth needed)
+          gcloud run deploy $SERVICE_NAME \
+            --image $IMAGE \
+            --region us-central1 \
+            --port ${{ matrix.port }} \
+            --allow-unauthenticated \
+            $DEPLOY_FLAGS

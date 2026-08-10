@@ -1,11 +1,11 @@
-name: Deploy Order Service
+name: Deploy Inventory Service
 
 on:
   push:
     branches: [main]
     paths:
-      - 'app/order-service/**'
-      - '.github/workflows/deploy-order.yml'
+      - 'app/inventory-service/**'
+      - '.github/workflows/staging-deploy-inventory.yml'
 
 jobs:
   # JOB 1: Build & Push (Runs on GitHub Cloud Servers - FREE CPU/RAM)
@@ -28,8 +28,8 @@ jobs:
 
       - name: Build & Push Docker Image
         run: |
-          IMAGE="${{ secrets.GCP_AR_REPO }}/order-service:staging"
-          docker build -t $IMAGE ./app/order-service
+          IMAGE="${{ secrets.GCP_AR_REPO }}/inventory-service:staging"
+          docker build -t $IMAGE ./app/inventory-service
           docker push $IMAGE
 
   # JOB 2: Deploy (Runs on Staging VM)
@@ -54,7 +54,7 @@ jobs:
           # Ensure VM Docker is authenticated to pull from AR
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
           
-          # Pull the new image and restart only order-service
-          docker compose -f docker-compose.staging.yml pull order-service
-          docker compose -f docker-compose.staging.yml up -d --no-deps order-service
+          # Pull the new image and restart only inventory-service
+          docker compose -f docker-compose.staging.yml pull inventory-service
+          docker compose -f docker-compose.staging.yml up -d --no-deps inventory-service
           docker restart nginx-proxy
