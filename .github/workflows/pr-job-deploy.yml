@@ -7,20 +7,8 @@ on:
         description: "Pull Request Number"
         required: true
         type: number
-      order_changed:
-        description: "Order service changed"
-        required: true
-        type: string
-      inventory_changed:
-        description: "Inventory service changed"
-        required: true
-        type: string
-      notification_changed:
-        description: "Notification service changed"
-        required: true
-        type: string
-      frontend_changed:
-        description: "Frontend changed"
+      changed_services:
+        description: "JSON array of changed services"
         required: true
         type: string
 
@@ -29,23 +17,9 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        service: [order-service, inventory-service, notification-service, frontend]
-        include:
-          - service: order-service
-            changed: ${{ inputs.order_changed }}
-            port: 3000
-          - service: inventory-service
-            changed: ${{ inputs.inventory_changed }}
-            port: 3001
-          - service: notification-service
-            changed: ${{ inputs.notification_changed }}
-            port: 3002
-          - service: frontend
-            changed: ${{ inputs.frontend_changed }}
-            port: 80
+        service: ${{ fromJSON(inputs.changed_services) }}
     steps:
       - name: Deploy to Cloud Run
-        if: matrix.changed == 'true'
         run: |
           IMAGE="${{ secrets.GCP_AR_REPO }}/${{ matrix.service }}:pr-${{ inputs.pr_number }}"
           SERVICE_NAME="${{ matrix.service }}-pr-${{ inputs.pr_number }}"
@@ -65,13 +39,17 @@ jobs:
           fi
           
           DEPLOY_FLAGS=""
+          PORT=80
           if [ "${{ matrix.service }}" == "order-service" ]; then
+            PORT=3000
             DB_ENV="DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@${VM_IP}:5432/order_db_pr_${PR_NUM}"
             DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV,$SERVICE_ENVS --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
           elif [ "${{ matrix.service }}" == "inventory-service" ]; then
+            PORT=3001
             DB_ENV="DATABASE_URL=mysql://root:$MYSQL_ROOT_PASSWORD@${VM_IP}:3306/inventory_db_pr_${PR_NUM}"
             DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV,$SERVICE_ENVS --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
           elif [ "${{ matrix.service }}" == "notification-service" ]; then
+            PORT=3002
             DB_ENV="DATABASE_URL=mongodb://${VM_IP}:27017/notification_db_pr_${PR_NUM}?replicaSet=rs0&directConnection=true"
             DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV,$SERVICE_ENVS --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
           fi
@@ -80,6 +58,6 @@ jobs:
           gcloud run deploy $SERVICE_NAME \
             --image $IMAGE \
             --region us-central1 \
-            --port ${{ matrix.port }} \
+            --port $PORT \
             --allow-unauthenticated \
             $DEPLOY_FLAGS

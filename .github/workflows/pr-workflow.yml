@@ -28,9 +28,7 @@ jobs:
     uses: ./.github/workflows/pr-job-clone-db.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
-      order_changed: ${{ needs.changes.outputs.order }}
-      inventory_changed: ${{ needs.changes.outputs.inventory }}
-      notification_changed: ${{ needs.changes.outputs.notification }}
+      changed_services: ${{ needs.changes.outputs.changed_services }}
     secrets: inherit
 
   # 4. Build & Push Images
@@ -40,10 +38,7 @@ jobs:
     uses: ./.github/workflows/pr-job-build.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
-      order_changed: ${{ needs.changes.outputs.order }}
-      inventory_changed: ${{ needs.changes.outputs.inventory }}
-      notification_changed: ${{ needs.changes.outputs.notification }}
-      frontend_changed: ${{ needs.changes.outputs.frontend }}
+      changed_services: ${{ needs.changes.outputs.changed_services }}
     secrets: inherit
 
   # 5. Deploy to Cloud Run
@@ -53,10 +48,7 @@ jobs:
     uses: ./.github/workflows/pr-job-deploy.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
-      order_changed: ${{ needs.changes.outputs.order }}
-      inventory_changed: ${{ needs.changes.outputs.inventory }}
-      notification_changed: ${{ needs.changes.outputs.notification }}
-      frontend_changed: ${{ needs.changes.outputs.frontend }}
+      changed_services: ${{ needs.changes.outputs.changed_services }}
     secrets: inherit
 
   # 6. Post GitHub Comment
@@ -66,8 +58,5 @@ jobs:
     uses: ./.github/workflows/pr-job-comment.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
-      order_changed: ${{ needs.changes.outputs.order }}
-      inventory_changed: ${{ needs.changes.outputs.inventory }}
-      notification_changed: ${{ needs.changes.outputs.notification }}
-      frontend_changed: ${{ needs.changes.outputs.frontend }}
+      changed_services: ${{ needs.changes.outputs.changed_services }}
     secrets: inherit

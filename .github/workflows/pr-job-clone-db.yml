@@ -7,16 +7,8 @@ on:
         description: "Pull Request Number"
         required: true
         type: number
-      order_changed:
-        description: "Order service changed"
-        required: true
-        type: string
-      inventory_changed:
-        description: "Inventory service changed"
-        required: true
-        type: string
-      notification_changed:
-        description: "Notification service changed"
+      changed_services:
+        description: "JSON array of changed services"
         required: true
         type: string
 
@@ -28,13 +20,13 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Clone Order DB
-        if: inputs.order_changed == 'true'
+        if: contains(fromJson(inputs.changed_services), 'order-service')
         run: bash ./scripts/clone_db.sh order-service ${{ inputs.pr_number }}
 
       - name: Clone Inventory DB
-        if: inputs.inventory_changed == 'true'
+        if: contains(fromJson(inputs.changed_services), 'inventory-service')
         run: bash ./scripts/clone_db.sh inventory-service ${{ inputs.pr_number }}
 
       - name: Clone Notification DB
-        if: inputs.notification_changed == 'true'
+        if: contains(fromJson(inputs.changed_services), 'notification-service')
         run: bash ./scripts/clone_db.sh notification-service ${{ inputs.pr_number }}

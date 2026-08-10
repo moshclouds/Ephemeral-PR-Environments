@@ -7,20 +7,8 @@ on:
         description: "Pull Request Number"
         required: true
         type: number
-      order_changed:
-        description: "Order service changed"
-        required: true
-        type: string
-      inventory_changed:
-        description: "Inventory service changed"
-        required: true
-        type: string
-      notification_changed:
-        description: "Notification service changed"
-        required: true
-        type: string
-      frontend_changed:
-        description: "Frontend changed"
+      changed_services:
+        description: "JSON array of changed services"
         required: true
         type: string
 
@@ -30,37 +18,23 @@ jobs:
     environment: staging
     strategy:
       matrix:
-        service: [order-service, inventory-service, notification-service, frontend]
-        include:
-          - service: order-service
-            changed: ${{ inputs.order_changed }}
-          - service: inventory-service
-            changed: ${{ inputs.inventory_changed }}
-          - service: notification-service
-            changed: ${{ inputs.notification_changed }}
-          - service: frontend
-            changed: ${{ inputs.frontend_changed }}
+        service: ${{ fromJSON(inputs.changed_services) }}
     steps:
       - name: Checkout Code
-        if: matrix.changed == 'true'
         uses: actions/checkout@v4
 
       - name: Authenticate to GCP
-        if: matrix.changed == 'true'
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
-        if: matrix.changed == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker Auth
-        if: matrix.changed == 'true'
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
       - name: Build & Push Image
-        if: matrix.changed == 'true'
         run: |
           IMAGE="${{ secrets.GCP_AR_REPO }}/${{ matrix.service }}:pr-${{ inputs.pr_number }}"
           if [ "${{ matrix.service }}" == "frontend" ]; then
