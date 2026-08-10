@@ -261,3 +261,26 @@ docker inspect infra-inventory-service-1 | grep OOMKilled
 docker exec nginx-proxy wget -qO- http://order-service:3000/
 ```
 
+---
+
+## ☁️ 9. Ephemeral PR Environments (Cloud Run Integration)
+
+In addition to the staging environment, this infrastructure also serves as the anchor for our **Ephemeral PR Environments**. When a PR is created, Cloud Run instances are spun up dynamically, but they still rely on this VM for databases and GitHub Actions.
+
+### 1. VM IAM Access Scopes (Crucial!)
+To allow the GitHub Actions Runner on this VM to clean up Cloud Run services when a PR is merged, the VM must have the correct Access Scopes:
+- By default, VMs are created with "Default Access". This will cause a `PERMISSION_DENIED (ACCESS_TOKEN_SCOPE_INSUFFICIENT)` error when the runner tries to delete Cloud Run services.
+- **Fix:** Stop the VM in GCP -> Edit -> Identity and API access -> Change Access scopes to **"Allow full access to all Cloud APIs"** -> Start the VM.
+
+### 2. Handling Ephemeral IP Restarts
+If you do not have a Static IP assigned, restarting this VM will assign it a new public IP address. If this happens, you must update:
+1. **DNS Records:** Update your A-Records (e.g., `client-web-app.ephemeral-poc.run.place`) to point to the new IP.
+2. **GitHub Secrets:** Update the `VM_HOST` secret in your repository so the GitHub Actions cleanup job can successfully SSH into the VM.
+
+### 3. Database Idempotency
+Our `clone_db.sh` scripts are idempotent. If you push multiple commits to the same PR, the pipeline will detect that the PR databases (e.g., `order_db_pr_5`) already exist on the VM and will skip cloning them again. This preserves test data across commits!
+
+### 4. MongoDB Replica Set Stability
+To support Prisma transactions on MongoDB, the staging MongoDB runs as a replica set (`rs0`).
+- Because Docker container IDs change on restart, the replica set config in `docker-compose.staging.yml` explicitly sets the host as `mongo-db:27017` instead of relying on random hashes.
+- Cloud Run services connect using `directConnection=true` to avoid `RsGhost` server selection timeout errors.
