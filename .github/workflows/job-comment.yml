@@ -1,0 +1,81 @@
+name: Comment Job
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        description: "Pull Request Number"
+        required: true
+        type: number
+      order_changed:
+        description: "Order service changed"
+        required: true
+        type: string
+      inventory_changed:
+        description: "Inventory service changed"
+        required: true
+        type: string
+      notification_changed:
+        description: "Notification service changed"
+        required: true
+        type: string
+      frontend_changed:
+        description: "Frontend changed"
+        required: true
+        type: string
+
+jobs:
+  post-comment:
+    if: inputs.order_changed == 'true' || inputs.inventory_changed == 'true' || inputs.notification_changed == 'true' || inputs.frontend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Frontend Query Params
+        id: params
+        run: |
+          PARAMS=""
+          [ "${{ inputs.order_changed }}" == "true" ] && PARAMS="${PARAMS}order_pr=${{ inputs.pr_number }}&"
+          [ "${{ inputs.inventory_changed }}" == "true" ] && PARAMS="${PARAMS}inventory_pr=${{ inputs.pr_number }}&"
+          [ "${{ inputs.notification_changed }}" == "true" ] && PARAMS="${PARAMS}notification_pr=${{ inputs.pr_number }}&"
+          PARAMS=${PARAMS%&}
+          echo "query=?$PARAMS" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNum = ${{ inputs.pr_number }};
+            const suffix = '${{ secrets.CLOUD_RUN_URL_SUFFIX }}';
+            const frontendChanged = '${{ inputs.frontend_changed }}' === 'true';
+            
+            let feUrl;
+            if (frontendChanged) {
+              feUrl = `https://frontend-pr-${prNum}${suffix}${{ steps.params.outputs.query }}`;
+            } else {
+              feUrl = `https://client-web-app.ephemeral-poc.run.place${{ steps.params.outputs.query }}`;
+            }
+            
+            let deployedServices = '';
+            if (frontendChanged) {
+              deployedServices += `- **Frontend:** [https://frontend-pr-${prNum}${suffix}](https://frontend-pr-${prNum}${suffix})\n`;
+            }
+            if ('${{ inputs.order_changed }}' === 'true') {
+              deployedServices += `- **Order Service:** [https://order-service-pr-${prNum}${suffix}](https://order-service-pr-${prNum}${suffix})\n`;
+            }
+            if ('${{ inputs.inventory_changed }}' === 'true') {
+              deployedServices += `- **Inventory Service:** [https://inventory-service-pr-${prNum}${suffix}](https://inventory-service-pr-${prNum}${suffix})\n`;
+            }
+            if ('${{ inputs.notification_changed }}' === 'true') {
+              deployedServices += `- **Notification Service:** [https://notification-service-pr-${prNum}${suffix}](https://notification-service-pr-${prNum}${suffix})\n`;
+            }
+
+            const body = `🚀 **Ephemeral PR Environment Deployed!**\n\n` +
+                         `Test your changes instantly using this link:\n` +
+                         `👉 [**Open Frontend PR Dashboard**](${feUrl})\n\n` +
+                         `### Deployed Cloud Run Services:\n` + deployedServices;
+            
+            github.rest.issues.createComment({
+              issue_number: prNum,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            })

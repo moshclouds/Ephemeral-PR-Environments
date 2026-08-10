@@ -1,0 +1,40 @@
+name: Changes Job
+
+on:
+  workflow_call:
+    outputs:
+      order:
+        description: "Order service changed"
+        value: ${{ jobs.changes.outputs.order }}
+      inventory:
+        description: "Inventory service changed"
+        value: ${{ jobs.changes.outputs.inventory }}
+      notification:
+        description: "Notification service changed"
+        value: ${{ jobs.changes.outputs.notification }}
+      frontend:
+        description: "Frontend changed"
+        value: ${{ jobs.changes.outputs.frontend }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      order: ${{ steps.filter.outputs.order }}
+      inventory: ${{ steps.filter.outputs.inventory }}
+      notification: ${{ steps.filter.outputs.notification }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            order:
+              - 'app/order-service/**'
+            inventory:
+              - 'app/inventory-service/**'
+            notification:
+              - 'app/notification-service/**'
+            frontend:
+              - 'app/frontend/**'
