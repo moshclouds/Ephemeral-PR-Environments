@@ -7,35 +7,23 @@ on:
         description: "Pull Request Number"
         required: true
         type: number
-      order_changed:
-        description: "Order service changed"
-        required: true
-        type: string
-      inventory_changed:
-        description: "Inventory service changed"
-        required: true
-        type: string
-      notification_changed:
-        description: "Notification service changed"
-        required: true
-        type: string
-      frontend_changed:
-        description: "Frontend changed"
+      changed_services:
+        description: "JSON array of changed services"
         required: true
         type: string
 
 jobs:
   post-comment:
-    if: inputs.order_changed == 'true' || inputs.inventory_changed == 'true' || inputs.notification_changed == 'true' || inputs.frontend_changed == 'true'
+    if: ${{ inputs.changed_services != '[]' && inputs.changed_services != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Generate Frontend Query Params
         id: params
         run: |
           PARAMS=""
-          [ "${{ inputs.order_changed }}" == "true" ] && PARAMS="${PARAMS}order_pr=${{ inputs.pr_number }}&"
-          [ "${{ inputs.inventory_changed }}" == "true" ] && PARAMS="${PARAMS}inventory_pr=${{ inputs.pr_number }}&"
-          [ "${{ inputs.notification_changed }}" == "true" ] && PARAMS="${PARAMS}notification_pr=${{ inputs.pr_number }}&"
+          if echo '${{ inputs.changed_services }}' | grep -q '"order-service"'; then PARAMS="${PARAMS}order_pr=${{ inputs.pr_number }}&"; fi
+          if echo '${{ inputs.changed_services }}' | grep -q '"inventory-service"'; then PARAMS="${PARAMS}inventory_pr=${{ inputs.pr_number }}&"; fi
+          if echo '${{ inputs.changed_services }}' | grep -q '"notification-service"'; then PARAMS="${PARAMS}notification_pr=${{ inputs.pr_number }}&"; fi
           PARAMS=${PARAMS%&}
           echo "query=?$PARAMS" >> $GITHUB_OUTPUT
 
@@ -45,7 +33,8 @@ jobs:
           script: |
             const prNum = ${{ inputs.pr_number }};
             const suffix = '${{ secrets.CLOUD_RUN_URL_SUFFIX }}';
-            const frontendChanged = '${{ inputs.frontend_changed }}' === 'true';
+            const changedServices = ${{ inputs.changed_services }};
+            const frontendChanged = changedServices.includes('frontend');
             
             let feUrl;
             if (frontendChanged) {
@@ -58,13 +47,13 @@ jobs:
             if (frontendChanged) {
               deployedServices += `- **Frontend:** [https://frontend-pr-${prNum}${suffix}](https://frontend-pr-${prNum}${suffix})\n`;
             }
-            if ('${{ inputs.order_changed }}' === 'true') {
+            if (changedServices.includes('order-service')) {
               deployedServices += `- **Order Service:** [https://order-service-pr-${prNum}${suffix}](https://order-service-pr-${prNum}${suffix})\n`;
             }
-            if ('${{ inputs.inventory_changed }}' === 'true') {
+            if (changedServices.includes('inventory-service')) {
               deployedServices += `- **Inventory Service:** [https://inventory-service-pr-${prNum}${suffix}](https://inventory-service-pr-${prNum}${suffix})\n`;
             }
-            if ('${{ inputs.notification_changed }}' === 'true') {
+            if (changedServices.includes('notification-service')) {
               deployedServices += `- **Notification Service:** [https://notification-service-pr-${prNum}${suffix}](https://notification-service-pr-${prNum}${suffix})\n`;
             }
 
