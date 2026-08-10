@@ -67,7 +67,7 @@ jobs:
           DEPLOY_FLAGS=""
           if [ "${{ matrix.service }}" == "order-service" ]; then
             DB_ENV="DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@${VM_IP}:5432/order_db_pr_${PR_NUM}"
-            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV,$SERVICE_ENVS --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }} --set-env-vars INVENTORY_SERVICE_URL=${{ secrets.VITE_API_INVENTORY_URL }} --set-env-vars NOTIFICATION_SERVICE_URL=${{ secrets.VITE_API_NOTIFICATION_URL }}"
+            DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV,$SERVICE_ENVS --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
           elif [ "${{ matrix.service }}" == "inventory-service" ]; then
             DB_ENV="DATABASE_URL=mysql://root:$MYSQL_ROOT_PASSWORD@${VM_IP}:3306/inventory_db_pr_${PR_NUM}"
             DEPLOY_FLAGS="--vpc-egress private-ranges-only --network default --subnet default --set-env-vars $DB_ENV,$SERVICE_ENVS --set-env-vars CLOUD_RUN_URL_SUFFIX=${{ secrets.CLOUD_RUN_URL_SUFFIX }}"
