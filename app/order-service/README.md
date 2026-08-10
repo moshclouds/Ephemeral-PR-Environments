@@ -1,4 +1,4 @@
-# Order Service Readme
+# Order Service
 
 The **Order Service** is a core microservice in our Ephemeral PR Environments POC. It is responsible for handling customer orders, communicating with the Inventory Service to deduct stock, and notifying the Notification Service to send confirmations.
 
