@@ -6,7 +6,7 @@ export class AppController {
   getHealth(): object {
     return {
       service: 'order-service',
-      status: 'healthy ABC-44',
+      status: 'healthy',
       timestamp: new Date().toISOString()
     };
   }
