@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  Logger,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { AsyncLocalStorage } from 'async_hooks';
@@ -13,6 +14,8 @@ export const headerStorage = new AsyncLocalStorage<Record<string, string>>();
 
 @Injectable()
 export class HeaderPropagationInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(HeaderPropagationInterceptor.name);
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     
@@ -22,6 +25,10 @@ export class HeaderPropagationInterceptor implements NestInterceptor {
       if (key.toLowerCase().startsWith('x-') && key.toLowerCase().endsWith('-pr')) {
         propagatedHeaders[key] = value as string;
       }
+    }
+    
+    if (Object.keys(propagatedHeaders).length > 0) {
+      this.logger.log(`[HTTP Interceptor] Received PR Headers: ${JSON.stringify(propagatedHeaders)}`);
     }
 
     // Run the rest of the request lifecycle within this async context

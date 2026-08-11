@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module, OnModuleInit, Logger } from '@nestjs/common';
 import { HttpModule, HttpService } from '@nestjs/axios';
 import { headerStorage } from '../../interceptors/header-propagation.interceptor';
 import { rewriteUrlForPr } from './url-resolver.util';
@@ -8,6 +8,8 @@ import { rewriteUrlForPr } from './url-resolver.util';
   exports: [HttpModule],
 })
 export class PrHttpModule implements OnModuleInit {
+  private readonly logger = new Logger(PrHttpModule.name);
+
   // Extract URLs to environment variables with sane defaults for local docker-compose
   private readonly inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:3001';
   private readonly notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:3002';
@@ -35,6 +37,9 @@ export class PrHttpModule implements OnModuleInit {
           ],
           this.cloudRunSuffix
         );
+        
+        this.logger.log(`[HTTP Interceptor] Outgoing request dynamically routed to: ${config.url}`);
+        this.logger.log(`[HTTP Interceptor] Attached propagated headers: ${JSON.stringify(headers)}`);
       }
       return config;
     });
