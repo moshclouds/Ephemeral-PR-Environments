@@ -5,7 +5,7 @@ export class AppController {
   @Get()
   getHealth(): object {
     return {
-      service: 'inventory-service',
+      service: 'inventory-service V2',
       status: 'healthy',
       timestamp: new Date().toISOString()
     };
