@@ -73,6 +73,60 @@ When a Pull Request is merged or closed, a cleanup GitHub Action automatically:
 
 ---
 
+## 📸 Demo Proofs & Walkthrough
+
+Here is a step-by-step visual walkthrough of the Ephemeral PR Environments in action based on our POC:
+
+### 1. Staging Project Deployment
+<img width="1458" height="1279" alt="Image" src="https://github.com/user-attachments/assets/9023fe93-331a-4d1c-acd1-664fa50dfe6e" />
+*The base infrastructure is successfully deployed to the persistent Staging VM, serving as our anchor environment.*
+
+### 2. Artifact Registry
+<img width="846" height="635" alt="Image" src="https://github.com/user-attachments/assets/6e1411b2-09d1-4187-b162-1dd3a2ea4aa0" />
+
+*Docker images for all microservices are successfully built and pushed to the Google Cloud Artifact Registry.*
+
+### 3. Staging VM Configuration
+<img width="1139" height="786" alt="Image" src="https://github.com/user-attachments/assets/90ff72c4-a9b2-4d28-8a30-b4a0ea81647c" />
+
+*The self-hosted GitHub Runner, Docker Compose stack, and local `.env` files are fully configured and running securely on the Staging VM.*
+
+### 4. Opening a Pull Request
+<img width="1451" height="1277" alt="Image" src="https://github.com/user-attachments/assets/4cee1ee9-eaf2-4b0a-808a-6e51cd5c9d87" />
+
+*A developer opens a new Pull Request. This instantly triggers the GitHub Actions CI/CD pipeline to evaluate changes and spin up targeted ephemeral resources.*
+
+### 5. Automated PR Comment
+<img width="1210" height="1140" alt="Image" src="https://github.com/user-attachments/assets/052b7c55-1ff8-4927-8ff1-02db492c3531" />
+
+*Once the pipeline finishes, the GitHub Action automatically posts a comment on the PR containing the dynamic, clickable preview URLs for QA testing.*
+
+### 6. Frontend Service (PR Isolated)
+<img width="1020" height="446" alt="Image" src="https://github.com/user-attachments/assets/54a6f94f-b08b-4c9b-bb8a-863ccb09d7c6" />
+
+*Clicking the preview link opens the Frontend hosted on a completely isolated Cloud Run instance, dynamically injecting PR tracking headers.*
+
+### 7. Order Service (PR Isolated)
+<img width="1279" height="507" alt="Image" src="https://github.com/user-attachments/assets/01b353af-7290-4ac7-ad21-fa7771a44f9a" />
+
+*The Order Service successfully intercepts the PR headers and communicates with its own cloned, isolated PostgreSQL database.*
+
+### 8. Inventory Service (PR Isolated)
+<img width="966" height="469" alt="Image" src="https://github.com/user-attachments/assets/b3c8aa2c-1f17-41c4-85b9-8496c2940a02" />
+
+*The Inventory Service is dynamically targeted by the Order Service and correctly interacts with its own isolated MySQL database clone.*
+
+### 9. Notification Service (PR Isolated)
+<img width="1013" height="372" alt="Image" src="https://github.com/user-attachments/assets/1232da4e-a066-436f-b77c-84546cecf640" />
+
+*The Notification Service successfully processes requests in its ephemeral Cloud Run container using its cloned MongoDB database.*
+
+### 10. Automated Cleanup on Merge
+<img width="932" height="736" alt="Image" src="https://github.com/user-attachments/assets/b7c0a462-ca6b-408b-89e4-88568fd58869" />
+
+*When the Pull Request is merged or closed, a cleanup pipeline automatically deletes the ephemeral Cloud Run instances and drops the isolated databases, reducing costs to zero.*
+
+---
 ## 🚀 Getting Started
 
 If you want to recreate this infrastructure from scratch, we have created a comprehensive, step-by-step setup guide. 
