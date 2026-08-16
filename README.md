@@ -17,6 +17,10 @@ This POC solves the cost-speed barrier to isolated testing by implementing a **H
 
 ## 🏗️ Architecture & Technologies
 
+<img width="1920" height="1080" alt="Image" src="https://github.com/user-attachments/assets/2fba418a-2332-46bd-b87f-8a5f307a86ea" />
+
+*A high-level view of our Hybrid Cloud architecture showing Serverless Cloud Run communicating with the Stateful Staging VM via Serverless VPC Access.*
+
 - **Frontend:** React + Vite + TailwindCSS
 - **Backend Services:** NestJS + Prisma ORM
 - **Databases:** PostgreSQL, MySQL, MongoDB
@@ -31,6 +35,11 @@ This POC solves the cost-speed barrier to isolated testing by implementing a **H
 Instead of deploying a full clone of the infrastructure for every PR, we utilize intelligent header propagation to dynamically route requests *only* to the services that were modified in the PR. All other requests seamlessly fall back to the persistent staging environment.
 
 #### The Architectural Flow (Example)
+
+<img width="1920" height="1080" alt="Image" src="https://github.com/user-attachments/assets/1604a3dc-5bdd-451e-a400-6e96ac948a50" />
+
+*The flow of an HTTP request as it originates from the QA engineer's browser and dynamically weaves between isolated PR instances and stable staging fallbacks.*
+
 Imagine a developer opens a PR (#5) that modifies the `order-service` and `inventory-service`, but leaves the `notification-service` completely untouched:
 
 1. **The Entrypoint (Frontend UI):**
